@@ -15,6 +15,9 @@ struct Velocity {
     y: f32,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct UnregisteredTag;
+
 fn next_entity_id_after_position_system() -> u64 {
     let world = World::new();
     let _entity = world.entity().set(Position { x: 1.0, y: 2.0 });
@@ -98,6 +101,44 @@ fn system_each_rejects_set_during_shared_field() {
     assert!(result.is_err());
     assert_eq!(world.entity().id(), expected_next_entity_id);
     assert!(!entity.has::<Velocity>());
+}
+
+// Covers system construction rejection before lazily registering a tag during row borrow.
+#[test]
+fn system_each_rejects_system_build_without_registering_tag() {
+    let world: &'static World = Box::leak(Box::new(World::new()));
+    world.entity().set(Position { x: 1.0, y: 2.0 });
+    let expected_next_entity_id = next_entity_id_after_position_system();
+
+    world.system::<(&Position,)>().each(move |(position,)| {
+        assert_eq!(*position, Position { x: 1.0, y: 2.0 });
+        world.system::<(&UnregisteredTag,)>().each(|_| {});
+    });
+
+    let result = catch_unwind(AssertUnwindSafe(|| {
+        world.progress();
+    }));
+
+    assert!(result.is_err());
+    assert_eq!(world.entity().id(), expected_next_entity_id);
+}
+
+// Covers system construction rejection during row borrow even for registered components.
+#[test]
+fn system_each_rejects_system_build_with_registered_component() {
+    let world: &'static World = Box::leak(Box::new(World::new()));
+    world.entity().set(Position { x: 1.0, y: 2.0 });
+
+    world.system::<(&Position,)>().each(move |(position,)| {
+        assert_eq!(*position, Position { x: 1.0, y: 2.0 });
+        world.system::<(&Position,)>().each(|_| {});
+    });
+
+    let result = catch_unwind(AssertUnwindSafe(|| {
+        world.progress();
+    }));
+
+    assert!(result.is_err());
 }
 
 // Covers rejecting duplicate component fields before system registration succeeds.

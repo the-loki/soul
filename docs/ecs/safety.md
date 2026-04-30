@@ -8,6 +8,8 @@
 
 任何实体上存在活动 component 借用时，`add`、`set`、`remove` 等结构性变更都会被拒绝并 panic。这样可以避免 flecs 因实体换表移动 component 存储，从而让仍然存活的 Rust 引用失效。
 
+首次 component/tag 注册以及 query/system 构建也被视为 world 级结构操作：只要当前存在任何活动 component 借用，就会被拒绝并 panic。已注册 component 的普通查找不触发该限制，但 query/system 构建无论参数是否已注册都会执行该检查，以避免 callback 内在 row guard 存活期间重新进入 flecs 构建路径。
+
 system callback 的 Rust panic 会在 C 回调边界被捕获并存入 `World`，随后从 `World::progress` 恢复 panic。清理回调中的 panic 无法交还给 Rust 调用方，因此会 abort，以保持 C ABI no-unwind 边界。
 
 `unsafe` 被限制在以下边界：

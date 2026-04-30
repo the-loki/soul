@@ -51,6 +51,7 @@ fn build_query<P>(world: &World) -> Query<'_, P>
 where
     P: QueryParamInternal,
 {
+    world.assert_no_active_component_borrows();
     let terms = P::terms(world);
     validate_unique_terms(&terms, "query");
     let ids = terms.iter().map(|term| term.id).collect::<Vec<_>>();

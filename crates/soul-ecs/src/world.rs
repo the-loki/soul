@@ -64,6 +64,11 @@ impl World {
     }
 
     pub(crate) fn component_info<T: Copy + 'static>(&self) -> ComponentInfo {
+        if let Some(info) = self.registry.borrow().get::<T>() {
+            return info;
+        }
+
+        self.assert_no_active_component_borrows();
         self.registry.borrow_mut().component::<T>(self.raw)
     }
 
@@ -92,6 +97,10 @@ impl World {
 
     pub(crate) fn assert_can_mutate_structure(&self, entity: sys::ecs_entity_t) {
         self.borrows.borrow().assert_can_mutate_structure(entity);
+    }
+
+    pub(crate) fn assert_no_active_component_borrows(&self) {
+        self.borrows.borrow().assert_no_active_component_borrows();
     }
 
     pub(crate) fn borrow_context(&self) -> BorrowContext {

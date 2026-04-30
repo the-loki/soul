@@ -60,6 +60,13 @@ impl BorrowTracker {
         );
     }
 
+    pub(crate) fn assert_no_active_component_borrows(&self) {
+        assert!(
+            self.borrows.is_empty(),
+            "world has active component borrows"
+        );
+    }
+
     fn release_shared(&mut self, key: BorrowKey) {
         match self.borrows.get_mut(&key) {
             Some(BorrowState::Shared(1)) => {

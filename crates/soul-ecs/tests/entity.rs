@@ -16,6 +16,14 @@ struct Velocity {
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct Tag;
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct UnregisteredTag;
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct UnregisteredComponent {
+    value: i32,
+}
+
 fn next_entity_id_after_position_entity() -> u64 {
     let world = World::new();
     let _entity = world.entity().set(Position { x: 1.0, y: 2.0 });
@@ -200,6 +208,57 @@ fn entity_rejects_remove_during_component_get_without_registering_component() {
     let result = catch_unwind(AssertUnwindSafe(|| {
         entity.get::<Position>(|_| {
             entity.remove::<Velocity>();
+        });
+    }));
+
+    assert!(result.is_err());
+    assert_eq!(world.entity().id(), expected_next_entity_id);
+}
+
+// Covers has rejection before lazily registering an unregistered tag.
+#[test]
+fn entity_rejects_has_during_component_get_without_registering_tag() {
+    let world = World::new();
+    let entity = world.entity().set(Position { x: 1.0, y: 2.0 });
+    let expected_next_entity_id = next_entity_id_after_position_entity();
+
+    let result = catch_unwind(AssertUnwindSafe(|| {
+        entity.get::<Position>(|_| {
+            entity.has::<UnregisteredTag>();
+        });
+    }));
+
+    assert!(result.is_err());
+    assert_eq!(world.entity().id(), expected_next_entity_id);
+}
+
+// Covers get rejection before lazily registering an unregistered component.
+#[test]
+fn entity_rejects_get_during_component_get_without_registering_component() {
+    let world = World::new();
+    let entity = world.entity().set(Position { x: 1.0, y: 2.0 });
+    let expected_next_entity_id = next_entity_id_after_position_entity();
+
+    let result = catch_unwind(AssertUnwindSafe(|| {
+        entity.get::<Position>(|_| {
+            entity.get::<UnregisteredComponent>(|_| {});
+        });
+    }));
+
+    assert!(result.is_err());
+    assert_eq!(world.entity().id(), expected_next_entity_id);
+}
+
+// Covers get_mut rejection before lazily registering an unregistered component.
+#[test]
+fn entity_rejects_get_mut_during_component_get_without_registering_component() {
+    let world = World::new();
+    let entity = world.entity().set(Position { x: 1.0, y: 2.0 });
+    let expected_next_entity_id = next_entity_id_after_position_entity();
+
+    let result = catch_unwind(AssertUnwindSafe(|| {
+        entity.get::<Position>(|_| {
+            entity.get_mut::<UnregisteredComponent>(|_| {});
         });
     }));
 

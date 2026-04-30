@@ -69,6 +69,7 @@ where
     P: QueryParamInternal,
     F: for<'row> FnMut(P::Item<'row>) + 'static,
 {
+    world.assert_no_active_component_borrows();
     let terms = P::terms(world);
     validate_unique_terms(&terms, "system");
     let ids = terms.iter().map(|term| term.id).collect::<Vec<_>>();

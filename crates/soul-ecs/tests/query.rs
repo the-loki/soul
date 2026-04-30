@@ -13,6 +13,9 @@ struct Velocity {
     y: f32,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct UnregisteredTag;
+
 fn next_entity_id_after_position_query() -> u64 {
     let world = World::new();
     let _entity = world.entity().set(Position { x: 1.0, y: 2.0 });
@@ -127,6 +130,42 @@ fn query_each_rejects_set_during_shared_field() {
     assert!(result.is_err());
     assert_eq!(world.entity().id(), expected_next_entity_id);
     assert!(!entity.has::<Velocity>());
+}
+
+// Covers query construction rejection before lazily registering a tag during row borrow.
+#[test]
+fn query_each_rejects_query_build_without_registering_tag() {
+    let world = World::new();
+    world.entity().set(Position { x: 1.0, y: 2.0 });
+
+    let query = world.query::<(&Position,)>().build();
+    let expected_next_entity_id = next_entity_id_after_position_query();
+    let result = catch_unwind(AssertUnwindSafe(|| {
+        query.each(|(position,)| {
+            assert_eq!(*position, Position { x: 1.0, y: 2.0 });
+            world.query::<(&UnregisteredTag,)>().build();
+        });
+    }));
+
+    assert!(result.is_err());
+    assert_eq!(world.entity().id(), expected_next_entity_id);
+}
+
+// Covers query construction rejection during row borrow even for registered components.
+#[test]
+fn query_each_rejects_query_build_with_registered_component() {
+    let world = World::new();
+    world.entity().set(Position { x: 1.0, y: 2.0 });
+
+    let query = world.query::<(&Position,)>().build();
+    let result = catch_unwind(AssertUnwindSafe(|| {
+        query.each(|(position,)| {
+            assert_eq!(*position, Position { x: 1.0, y: 2.0 });
+            world.query::<(&Position,)>().build();
+        });
+    }));
+
+    assert!(result.is_err());
 }
 
 // Covers rejecting duplicate component fields before query iteration starts.

@@ -17,6 +17,10 @@ pub(crate) struct Registry {
 }
 
 impl Registry {
+    pub(crate) fn get<T: Copy + 'static>(&self) -> Option<ComponentInfo> {
+        self.components.get(&TypeId::of::<T>()).copied()
+    }
+
     pub(crate) fn component<T: Copy + 'static>(
         &mut self,
         world: *mut sys::ecs_world_t,
