@@ -1,17 +1,24 @@
+use std::any::Any;
 use std::cell::RefCell;
+use std::panic::resume_unwind;
+use std::rc::Rc;
 
 use soul_ecs_sys as sys;
 
-use crate::borrow::{BorrowTracker, ComponentBorrowGuard};
+use crate::borrow::{BorrowContext, BorrowTracker, ComponentBorrowGuard};
 use crate::entity::Entity;
 use crate::param::QueryParam;
 use crate::query::QueryBuilder;
 use crate::registry::{ComponentInfo, Registry};
+use crate::system::SystemBuilder;
+
+pub(crate) type PanicSlot = Rc<RefCell<Option<Box<dyn Any + Send>>>>;
 
 pub struct World {
     raw: *mut sys::ecs_world_t,
     registry: RefCell<Registry>,
-    borrows: RefCell<BorrowTracker>,
+    borrows: Rc<RefCell<BorrowTracker>>,
+    pending_panic: PanicSlot,
 }
 
 impl World {
@@ -22,7 +29,8 @@ impl World {
         Self {
             raw,
             registry: RefCell::new(Registry::default()),
-            borrows: RefCell::new(BorrowTracker::default()),
+            borrows: Rc::new(RefCell::new(BorrowTracker::default())),
+            pending_panic: Rc::new(RefCell::new(None)),
         }
     }
 
@@ -41,6 +49,20 @@ impl World {
         QueryBuilder::new(self)
     }
 
+    pub fn system<P: QueryParam>(&self) -> SystemBuilder<'_, P> {
+        SystemBuilder::new(self)
+    }
+
+    pub fn progress(&self) -> bool {
+        // SAFETY: self.raw is a valid, live flecs world owned by World.
+        let progressed = unsafe { sys::ecs_progress(self.raw, 0.0) };
+        let pending_panic = self.pending_panic.borrow_mut().take();
+        if let Some(payload) = pending_panic {
+            resume_unwind(payload);
+        }
+        progressed
+    }
+
     pub(crate) fn component_info<T: Copy + 'static>(&self) -> ComponentInfo {
         self.registry.borrow_mut().component::<T>(self.raw)
     }
@@ -49,8 +71,8 @@ impl World {
         &self,
         entity: sys::ecs_entity_t,
         component: sys::ecs_id_t,
-    ) -> ComponentBorrowGuard<'_> {
-        ComponentBorrowGuard::shared(&self.borrows, entity, component)
+    ) -> ComponentBorrowGuard {
+        ComponentBorrowGuard::shared(Rc::clone(&self.borrows), entity, component)
     }
 
     pub(crate) fn borrow_component_mut(
@@ -58,8 +80,22 @@ impl World {
         entity: sys::ecs_entity_t,
         component: sys::ecs_id_t,
         notify_modified: bool,
-    ) -> ComponentBorrowGuard<'_> {
-        ComponentBorrowGuard::mutable(&self.borrows, self.raw, entity, component, notify_modified)
+    ) -> ComponentBorrowGuard {
+        ComponentBorrowGuard::mutable(
+            Rc::clone(&self.borrows),
+            self.raw,
+            entity,
+            component,
+            notify_modified,
+        )
+    }
+
+    pub(crate) fn borrow_context(&self) -> BorrowContext {
+        BorrowContext::new(Rc::clone(&self.borrows), self.raw)
+    }
+
+    pub(crate) fn panic_slot(&self) -> PanicSlot {
+        Rc::clone(&self.pending_panic)
     }
 }
 

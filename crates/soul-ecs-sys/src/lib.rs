@@ -86,5 +86,6 @@ extern "C" {
     ) -> ecs_entity_t;
     pub fn soul_ecs_iter_count(iter: *const ecs_iter_t) -> i32;
     pub fn soul_ecs_iter_field(iter: *const ecs_iter_t, size: usize, index: i8) -> *mut c_void;
+    pub fn soul_ecs_iter_entity(iter: *const ecs_iter_t, row: i32) -> ecs_entity_t;
     pub fn soul_ecs_iter_ctx(iter: *const ecs_iter_t) -> *mut c_void;
 }

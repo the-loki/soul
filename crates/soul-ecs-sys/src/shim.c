@@ -129,6 +129,13 @@ void *soul_ecs_iter_field(const ecs_iter_t *iter, size_t size, int8_t index) {
     return ecs_field_w_size(iter, size, index);
 }
 
+ecs_entity_t soul_ecs_iter_entity(const ecs_iter_t *iter, int32_t row) {
+    if (!iter || !iter->entities || row < 0 || row >= iter->count) {
+        return 0;
+    }
+    return iter->entities[row];
+}
+
 void *soul_ecs_iter_ctx(const ecs_iter_t *iter) {
     return iter->ctx;
 }

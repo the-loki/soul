@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use soul_ecs_sys as sys;
 
-use crate::param::{QueryParam, QueryParamInternal, Term};
+use crate::param::{validate_unique_terms, QueryParam, QueryParamInternal, Term};
 use crate::world::World;
 
 pub struct QueryBuilder<'world, P> {
@@ -44,7 +44,7 @@ where
     P: QueryParamInternal,
 {
     let terms = P::terms(world);
-    validate_terms(&terms);
+    validate_unique_terms(&terms, "query");
     let ids = terms.iter().map(|term| term.id).collect::<Vec<_>>();
     let inouts = terms.iter().map(|term| term.inout).collect::<Vec<_>>();
     // SAFETY: world is live, and ids/inouts point to count initialized terms for this call.
@@ -65,14 +65,6 @@ where
         raw,
         terms,
         _marker: PhantomData,
-    }
-}
-
-fn validate_terms(terms: &[Term]) {
-    for (index, term) in terms.iter().enumerate() {
-        for other in &terms[index + 1..] {
-            assert_ne!(term.id, other.id, "duplicate component in query parameter");
-        }
     }
 }
 
@@ -124,7 +116,7 @@ where
             let entity = unsafe { sys::soul_ecs_query_iter_entity(iter, row) };
             assert_ne!(entity, 0, "query iterator returned an invalid entity");
 
-            let _guards = P::borrow_row(query.world, entity, &query.terms);
+            let _guards = P::borrow_row(&query.world.borrow_context(), entity, &query.terms);
             // SAFETY: row is in bounds, field terms match P, and borrow guards are active.
             let item = unsafe { P::fetch_row(iter, row) };
             f(item);

@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use soul_ecs_sys as sys;
 
@@ -72,8 +73,43 @@ impl BorrowTracker {
     }
 }
 
-pub(crate) struct ComponentBorrowGuard<'world> {
-    tracker: &'world RefCell<BorrowTracker>,
+#[derive(Clone)]
+pub(crate) struct BorrowContext {
+    tracker: Rc<RefCell<BorrowTracker>>,
+    world: *mut sys::ecs_world_t,
+}
+
+impl BorrowContext {
+    pub(crate) fn new(tracker: Rc<RefCell<BorrowTracker>>, world: *mut sys::ecs_world_t) -> Self {
+        Self { tracker, world }
+    }
+
+    pub(crate) fn shared(
+        &self,
+        entity: sys::ecs_entity_t,
+        component: sys::ecs_id_t,
+    ) -> ComponentBorrowGuard {
+        ComponentBorrowGuard::shared(Rc::clone(&self.tracker), entity, component)
+    }
+
+    pub(crate) fn mutable(
+        &self,
+        entity: sys::ecs_entity_t,
+        component: sys::ecs_id_t,
+        notify_modified: bool,
+    ) -> ComponentBorrowGuard {
+        ComponentBorrowGuard::mutable(
+            Rc::clone(&self.tracker),
+            self.world,
+            entity,
+            component,
+            notify_modified,
+        )
+    }
+}
+
+pub(crate) struct ComponentBorrowGuard {
+    tracker: Rc<RefCell<BorrowTracker>>,
     key: BorrowKey,
     kind: ComponentBorrowKind,
 }
@@ -86,9 +122,9 @@ enum ComponentBorrowKind {
     },
 }
 
-impl<'world> ComponentBorrowGuard<'world> {
+impl ComponentBorrowGuard {
     pub(crate) fn shared(
-        tracker: &'world RefCell<BorrowTracker>,
+        tracker: Rc<RefCell<BorrowTracker>>,
         entity: sys::ecs_entity_t,
         component: sys::ecs_id_t,
     ) -> Self {
@@ -102,7 +138,7 @@ impl<'world> ComponentBorrowGuard<'world> {
     }
 
     pub(crate) fn mutable(
-        tracker: &'world RefCell<BorrowTracker>,
+        tracker: Rc<RefCell<BorrowTracker>>,
         world: *mut sys::ecs_world_t,
         entity: sys::ecs_entity_t,
         component: sys::ecs_id_t,
@@ -121,7 +157,7 @@ impl<'world> ComponentBorrowGuard<'world> {
     }
 }
 
-impl Drop for ComponentBorrowGuard<'_> {
+impl Drop for ComponentBorrowGuard {
     fn drop(&mut self) {
         match self.kind {
             ComponentBorrowKind::Shared => {
