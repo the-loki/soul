@@ -1,7 +1,13 @@
+use std::cell::RefCell;
+
 use soul_ecs_sys as sys;
+
+use crate::entity::Entity;
+use crate::registry::{ComponentInfo, Registry};
 
 pub struct World {
     raw: *mut sys::ecs_world_t,
+    registry: RefCell<Registry>,
 }
 
 impl World {
@@ -9,11 +15,25 @@ impl World {
         // SAFETY: ecs_init creates a new flecs world and returns ownership to the caller.
         let raw = unsafe { sys::ecs_init() };
         assert!(!raw.is_null(), "failed to initialize flecs world");
-        Self { raw }
+        Self {
+            raw,
+            registry: RefCell::new(Registry::default()),
+        }
     }
 
     pub fn as_ptr(&self) -> *mut sys::ecs_world_t {
         self.raw
+    }
+
+    pub fn entity(&self) -> Entity<'_> {
+        // SAFETY: self.raw is a valid, live flecs world owned by World.
+        let raw = unsafe { sys::ecs_new(self.raw) };
+        assert_ne!(raw, 0, "failed to create entity");
+        Entity::new(self, raw)
+    }
+
+    pub(crate) fn component_info<T: Copy + 'static>(&self) -> ComponentInfo {
+        self.registry.borrow_mut().component::<T>(self.raw)
     }
 }
 
