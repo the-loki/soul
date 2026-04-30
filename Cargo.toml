@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "crates/soul-ecs-sys",
+    "crates/soul-ecs",
 ]
 resolver = "2"
 
