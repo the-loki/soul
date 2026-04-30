@@ -6,3 +6,4 @@
 
 - [ECS 概览](docs/ecs/overview.md)
 - [ECS 安全边界](docs/ecs/safety.md)
+- [ECS 基准测试](docs/ecs/benchmark.md)

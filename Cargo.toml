@@ -11,4 +11,5 @@ license = "MIT"
 
 [workspace.dependencies]
 cc = "1"
+criterion = { version = "0.7", features = ["html_reports"] }
 soul-ecs-sys = { path = "crates/soul-ecs-sys" }

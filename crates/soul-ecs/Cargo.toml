@@ -6,3 +6,10 @@ license.workspace = true
 
 [dependencies]
 soul-ecs-sys.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+
+[[bench]]
+name = "ecs_benchmark"
+harness = false
