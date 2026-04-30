@@ -176,7 +176,17 @@ where
     P: QueryParamInternal,
 {
     if !context.is_null() {
-        // SAFETY: context was allocated with Box::into_raw in build_system for this P.
-        unsafe { drop(Box::from_raw(context.cast::<SystemContext<P>>())) };
+        let result = catch_unwind(AssertUnwindSafe(|| {
+            // SAFETY: context was allocated with Box::into_raw in build_system for this P.
+            unsafe { drop(Box::from_raw(context.cast::<SystemContext<P>>())) };
+        }));
+
+        if result.is_err() {
+            // Panics from ctx_free would otherwise unwind through a C ABI cleanup callback.
+            // There is no Rust caller that can resume the panic here, so abort to preserve
+            // the no-unwind boundary contract.
+            eprintln!("soul-ecs: system context cleanup panicked; aborting");
+            std::process::abort();
+        }
     }
 }
