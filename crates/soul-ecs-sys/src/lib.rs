@@ -72,6 +72,8 @@ extern "C" {
         size: usize,
         index: i8,
     ) -> *mut c_void;
+    pub fn soul_ecs_query_iter_entity(iter: *const soul_ecs_query_iter_t, row: i32)
+        -> ecs_entity_t;
     pub fn soul_ecs_query_iter_fini(iter: *mut soul_ecs_query_iter_t);
     pub fn soul_ecs_system_init(
         world: *mut ecs_world_t,

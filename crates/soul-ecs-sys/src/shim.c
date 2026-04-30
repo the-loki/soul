@@ -75,6 +75,16 @@ void *soul_ecs_query_iter_field(
     return ecs_field_w_size(&wrapper->iter, size, index);
 }
 
+ecs_entity_t soul_ecs_query_iter_entity(
+    const soul_ecs_query_iter_t *wrapper,
+    int32_t row
+) {
+    if (!wrapper || !wrapper->iter.entities || row < 0 || row >= wrapper->iter.count) {
+        return 0;
+    }
+    return wrapper->iter.entities[row];
+}
+
 void soul_ecs_query_iter_fini(soul_ecs_query_iter_t *wrapper) {
     if (!wrapper) {
         return;

@@ -4,6 +4,8 @@ use soul_ecs_sys as sys;
 
 use crate::borrow::{BorrowTracker, ComponentBorrowGuard};
 use crate::entity::Entity;
+use crate::param::QueryParam;
+use crate::query::QueryBuilder;
 use crate::registry::{ComponentInfo, Registry};
 
 pub struct World {
@@ -33,6 +35,10 @@ impl World {
         let raw = unsafe { sys::ecs_new(self.raw) };
         assert_ne!(raw, 0, "failed to create entity");
         Entity::new(self, raw)
+    }
+
+    pub fn query<P: QueryParam>(&self) -> QueryBuilder<'_, P> {
+        QueryBuilder::new(self)
     }
 
     pub(crate) fn component_info<T: Copy + 'static>(&self) -> ComponentInfo {
