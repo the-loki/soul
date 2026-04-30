@@ -80,3 +80,15 @@ fn query_each_rejects_mutable_get_during_shared_field() {
         position.y = 8.0;
     });
 }
+
+// Covers rejecting duplicate component fields before query iteration starts.
+#[test]
+fn query_build_rejects_duplicate_components() {
+    let world = World::new();
+
+    let result = catch_unwind(AssertUnwindSafe(|| {
+        world.query::<(&mut Position, &Position)>().build();
+    }));
+
+    assert!(result.is_err());
+}

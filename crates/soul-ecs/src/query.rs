@@ -23,6 +23,7 @@ where
 
     pub fn build(self) -> Query<'world, P> {
         let terms = P::terms(self.world);
+        validate_terms(&terms);
         let ids = terms.iter().map(|term| term.id).collect::<Vec<_>>();
         let inouts = terms.iter().map(|term| term.inout).collect::<Vec<_>>();
         // SAFETY: self.world is live, and ids/inouts point to count initialized terms for this call.
@@ -43,6 +44,14 @@ where
             raw,
             terms,
             _marker: PhantomData,
+        }
+    }
+}
+
+fn validate_terms(terms: &[Term]) {
+    for (index, term) in terms.iter().enumerate() {
+        for other in &terms[index + 1..] {
+            assert_ne!(term.id, other.id, "duplicate component in query parameter");
         }
     }
 }

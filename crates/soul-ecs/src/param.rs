@@ -6,7 +6,6 @@ use soul_ecs_sys as sys;
 use crate::borrow::ComponentBorrowGuard;
 use crate::world::World;
 
-#[doc(hidden)]
 #[derive(Clone, Copy)]
 pub struct Term {
     pub(crate) id: sys::ecs_id_t,
@@ -14,7 +13,6 @@ pub struct Term {
     pub(crate) access: TermAccess,
 }
 
-#[doc(hidden)]
 #[derive(Clone, Copy)]
 pub enum TermAccess {
     Shared,
@@ -41,7 +39,6 @@ impl Term {
     }
 }
 
-#[doc(hidden)]
 pub struct QueryBorrowGuards<'world> {
     guards: Vec<ComponentBorrowGuard<'world>>,
 }
@@ -64,24 +61,34 @@ impl<'world> QueryBorrowGuards<'world> {
     }
 }
 
-pub trait QueryParam: sealed::Sealed {
+pub trait QueryParam: sealed::QueryParamInternal {
     type Item<'row>;
+}
 
-    #[doc(hidden)]
-    fn terms(world: &World) -> Vec<Term>;
+pub(crate) use sealed::QueryParamInternal;
 
-    #[doc(hidden)]
-    fn borrow_row<'world>(
-        world: &'world World,
-        entity: sys::ecs_entity_t,
-        terms: &[Term],
-    ) -> QueryBorrowGuards<'world>;
+mod sealed {
+    use soul_ecs_sys as sys;
 
-    #[doc(hidden)]
-    unsafe fn fetch_row<'row>(
-        iter: *const sys::soul_ecs_query_iter_t,
-        row: i32,
-    ) -> Self::Item<'row>;
+    use crate::param::{QueryBorrowGuards, Term};
+    use crate::world::World;
+
+    pub trait QueryParamInternal {
+        fn terms(world: &World) -> Vec<Term>;
+
+        fn borrow_row<'world>(
+            world: &'world World,
+            entity: sys::ecs_entity_t,
+            terms: &[Term],
+        ) -> QueryBorrowGuards<'world>;
+
+        unsafe fn fetch_row<'row>(
+            iter: *const sys::soul_ecs_query_iter_t,
+            row: i32,
+        ) -> <Self as super::QueryParam>::Item<'row>
+        where
+            Self: super::QueryParam;
+    }
 }
 
 pub(crate) struct Field<'row, T> {
@@ -114,11 +121,11 @@ impl<'row, T> Field<'row, T> {
     }
 }
 
-impl<T: Copy + 'static> sealed::Sealed for (&T,) {}
-
 impl<T: Copy + 'static> QueryParam for (&T,) {
     type Item<'row> = (&'row T,);
+}
 
+impl<T: Copy + 'static> QueryParamInternal for (&T,) {
     fn terms(world: &World) -> Vec<Term> {
         vec![Term::shared::<T>(world)]
     }
@@ -136,17 +143,17 @@ impl<T: Copy + 'static> QueryParam for (&T,) {
     unsafe fn fetch_row<'row>(
         iter: *const sys::soul_ecs_query_iter_t,
         row: i32,
-    ) -> Self::Item<'row> {
+    ) -> <Self as QueryParam>::Item<'row> {
         // SAFETY: Query::each only calls this for matching rows after acquiring shared guards.
         (unsafe { Field::<T>::from_iter(iter, row, 0).shared() },)
     }
 }
 
-impl<T: Copy + 'static> sealed::Sealed for (&mut T,) {}
-
 impl<T: Copy + 'static> QueryParam for (&mut T,) {
     type Item<'row> = (&'row mut T,);
+}
 
+impl<T: Copy + 'static> QueryParamInternal for (&mut T,) {
     fn terms(world: &World) -> Vec<Term> {
         vec![Term::mutable::<T>(world)]
     }
@@ -164,17 +171,17 @@ impl<T: Copy + 'static> QueryParam for (&mut T,) {
     unsafe fn fetch_row<'row>(
         iter: *const sys::soul_ecs_query_iter_t,
         row: i32,
-    ) -> Self::Item<'row> {
+    ) -> <Self as QueryParam>::Item<'row> {
         // SAFETY: Query::each only calls this for matching rows after acquiring mutable guards.
         (unsafe { Field::<T>::from_iter(iter, row, 0).mutable() },)
     }
 }
 
-impl<T: Copy + 'static, U: Copy + 'static> sealed::Sealed for (&mut T, &U) {}
-
 impl<T: Copy + 'static, U: Copy + 'static> QueryParam for (&mut T, &U) {
     type Item<'row> = (&'row mut T, &'row U);
+}
 
+impl<T: Copy + 'static, U: Copy + 'static> QueryParamInternal for (&mut T, &U) {
     fn terms(world: &World) -> Vec<Term> {
         vec![Term::mutable::<T>(world), Term::shared::<U>(world)]
     }
@@ -193,15 +200,11 @@ impl<T: Copy + 'static, U: Copy + 'static> QueryParam for (&mut T, &U) {
     unsafe fn fetch_row<'row>(
         iter: *const sys::soul_ecs_query_iter_t,
         row: i32,
-    ) -> Self::Item<'row> {
+    ) -> <Self as QueryParam>::Item<'row> {
         // SAFETY: Query::each only calls this for matching rows after acquiring row guards.
         (
             unsafe { Field::<T>::from_iter(iter, row, 0).mutable() },
             unsafe { Field::<U>::from_iter(iter, row, 1).shared() },
         )
     }
-}
-
-mod sealed {
-    pub trait Sealed {}
 }
