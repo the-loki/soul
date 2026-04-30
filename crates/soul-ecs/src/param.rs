@@ -7,14 +7,14 @@ use crate::borrow::ComponentBorrowGuard;
 use crate::world::World;
 
 #[derive(Clone, Copy)]
-pub struct Term {
+pub(crate) struct Term {
     pub(crate) id: sys::ecs_id_t,
     pub(crate) inout: i16,
     pub(crate) access: TermAccess,
 }
 
 #[derive(Clone, Copy)]
-pub enum TermAccess {
+pub(crate) enum TermAccess {
     Shared,
     Mutable,
 }
@@ -39,7 +39,7 @@ impl Term {
     }
 }
 
-pub struct QueryBorrowGuards<'world> {
+pub(crate) struct QueryBorrowGuards<'world> {
     guards: Vec<ComponentBorrowGuard<'world>>,
 }
 
@@ -61,34 +61,23 @@ impl<'world> QueryBorrowGuards<'world> {
     }
 }
 
-pub trait QueryParam: sealed::QueryParamInternal {
+pub trait QueryParam {
     type Item<'row>;
 }
 
-pub(crate) use sealed::QueryParamInternal;
+pub(crate) trait QueryParamInternal: QueryParam {
+    fn terms(world: &World) -> Vec<Term>;
 
-mod sealed {
-    use soul_ecs_sys as sys;
+    fn borrow_row<'world>(
+        world: &'world World,
+        entity: sys::ecs_entity_t,
+        terms: &[Term],
+    ) -> QueryBorrowGuards<'world>;
 
-    use crate::param::{QueryBorrowGuards, Term};
-    use crate::world::World;
-
-    pub trait QueryParamInternal {
-        fn terms(world: &World) -> Vec<Term>;
-
-        fn borrow_row<'world>(
-            world: &'world World,
-            entity: sys::ecs_entity_t,
-            terms: &[Term],
-        ) -> QueryBorrowGuards<'world>;
-
-        unsafe fn fetch_row<'row>(
-            iter: *const sys::soul_ecs_query_iter_t,
-            row: i32,
-        ) -> <Self as super::QueryParam>::Item<'row>
-        where
-            Self: super::QueryParam;
-    }
+    unsafe fn fetch_row<'row>(
+        iter: *const sys::soul_ecs_query_iter_t,
+        row: i32,
+    ) -> <Self as QueryParam>::Item<'row>;
 }
 
 pub(crate) struct Field<'row, T> {
