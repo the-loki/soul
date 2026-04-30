@@ -18,6 +18,7 @@ enum BorrowState {
 #[derive(Default)]
 pub(crate) struct BorrowTracker {
     borrows: HashMap<BorrowKey, BorrowState>,
+    entity_borrow_counts: HashMap<sys::ecs_entity_t, usize>,
 }
 
 impl BorrowTracker {
@@ -25,12 +26,14 @@ impl BorrowTracker {
         match self.borrows.get_mut(&key) {
             Some(BorrowState::Shared(count)) => {
                 *count += 1;
+                self.increment_entity_borrow(key.entity);
             }
             Some(BorrowState::Mutable) => {
                 panic!("component is already mutably borrowed");
             }
             None => {
                 self.borrows.insert(key, BorrowState::Shared(1));
+                self.increment_entity_borrow(key.entity);
             }
         }
     }
@@ -45,17 +48,27 @@ impl BorrowTracker {
             }
             None => {
                 self.borrows.insert(key, BorrowState::Mutable);
+                self.increment_entity_borrow(key.entity);
             }
         }
+    }
+
+    pub(crate) fn assert_can_mutate_structure(&self, entity: sys::ecs_entity_t) {
+        assert!(
+            !self.entity_borrow_counts.contains_key(&entity),
+            "entity has active component borrows"
+        );
     }
 
     fn release_shared(&mut self, key: BorrowKey) {
         match self.borrows.get_mut(&key) {
             Some(BorrowState::Shared(1)) => {
                 self.borrows.remove(&key);
+                self.decrement_entity_borrow(key.entity);
             }
             Some(BorrowState::Shared(count)) => {
                 *count -= 1;
+                self.decrement_entity_borrow(key.entity);
             }
             Some(BorrowState::Mutable) | None => {
                 unreachable!("shared component borrow state is inconsistent");
@@ -65,9 +78,29 @@ impl BorrowTracker {
 
     fn release_mutable(&mut self, key: BorrowKey) {
         match self.borrows.remove(&key) {
-            Some(BorrowState::Mutable) => {}
+            Some(BorrowState::Mutable) => {
+                self.decrement_entity_borrow(key.entity);
+            }
             Some(BorrowState::Shared(_)) | None => {
                 unreachable!("mutable component borrow state is inconsistent");
+            }
+        }
+    }
+
+    fn increment_entity_borrow(&mut self, entity: sys::ecs_entity_t) {
+        *self.entity_borrow_counts.entry(entity).or_insert(0) += 1;
+    }
+
+    fn decrement_entity_borrow(&mut self, entity: sys::ecs_entity_t) {
+        match self.entity_borrow_counts.get_mut(&entity) {
+            Some(1) => {
+                self.entity_borrow_counts.remove(&entity);
+            }
+            Some(count) => {
+                *count -= 1;
+            }
+            None => {
+                unreachable!("entity borrow state is inconsistent");
             }
         }
     }

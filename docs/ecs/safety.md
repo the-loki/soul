@@ -6,6 +6,8 @@
 
 组件访问使用运行时借用守卫维护 Rust 侧别名规则：共享读取可以重入；共享读取期间的可变访问、可变访问期间的共享读取、以及重复可变访问都会 panic。
 
+任何实体上存在活动 component 借用时，`add`、`set`、`remove` 等结构性变更都会被拒绝并 panic。这样可以避免 flecs 因实体换表移动 component 存储，从而让仍然存活的 Rust 引用失效。
+
 system callback 的 Rust panic 会在 C 回调边界被捕获并存入 `World`，随后从 `World::progress` 恢复 panic。清理回调中的 panic 无法交还给 Rust 调用方，因此会 abort，以保持 C ABI no-unwind 边界。
 
 `unsafe` 被限制在以下边界：

@@ -34,7 +34,7 @@ impl World {
         }
     }
 
-    pub fn as_ptr(&self) -> *mut sys::ecs_world_t {
+    pub(crate) fn as_ptr(&self) -> *mut sys::ecs_world_t {
         self.raw
     }
 
@@ -88,6 +88,10 @@ impl World {
             component,
             notify_modified,
         )
+    }
+
+    pub(crate) fn assert_can_mutate_structure(&self, entity: sys::ecs_entity_t) {
+        self.borrows.borrow().assert_can_mutate_structure(entity);
     }
 
     pub(crate) fn borrow_context(&self) -> BorrowContext {

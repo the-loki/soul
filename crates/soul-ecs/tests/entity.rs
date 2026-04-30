@@ -117,6 +117,22 @@ fn entity_rejects_mutable_get_during_mutable_get() {
     assert!(result.is_err());
 }
 
+// Covers structural mutation rejection while any component borrow is active.
+#[test]
+fn entity_rejects_set_during_component_get() {
+    let world = World::new();
+    let entity = world.entity().set(Position { x: 1.0, y: 2.0 });
+
+    let result = catch_unwind(AssertUnwindSafe(|| {
+        entity.get::<Position>(|_| {
+            entity.set(Velocity { x: 3.0, y: 4.0 });
+        });
+    }));
+
+    assert!(result.is_err());
+    assert!(!entity.has::<Velocity>());
+}
+
 // Covers tag-only add while data components must be initialized through set.
 #[test]
 fn entity_add_only_accepts_zero_sized_tag_components() {

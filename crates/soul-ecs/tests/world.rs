@@ -1,11 +1,13 @@
 use soul_ecs::World;
 
-// Covers safe world creation, raw pointer ownership, and drop.
+// Covers safe world creation and drop through the public facade.
 #[test]
 fn creates_and_drops_world() {
     let world = World::new();
-    assert!(!world.as_ptr().is_null());
+    let entity = world.entity();
+    assert_ne!(entity.id(), 0);
 
     let default_world = World::default();
-    assert!(!default_world.as_ptr().is_null());
+    let default_entity = default_world.entity();
+    assert_ne!(default_entity.id(), 0);
 }

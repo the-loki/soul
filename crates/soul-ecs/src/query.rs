@@ -32,6 +32,14 @@ impl<'world, 'param, T: Copy + 'static> QueryBuilder<'world, (&'param mut T,)> {
 }
 
 impl<'world, 'param, T: Copy + 'static, U: Copy + 'static>
+    QueryBuilder<'world, (&'param T, &'param U)>
+{
+    pub fn build(self) -> Query<'world, (&'param T, &'param U)> {
+        build_query(self.world)
+    }
+}
+
+impl<'world, 'param, T: Copy + 'static, U: Copy + 'static>
     QueryBuilder<'world, (&'param mut T, &'param U)>
 {
     pub fn build(self) -> Query<'world, (&'param mut T, &'param U)> {
@@ -83,6 +91,15 @@ impl<'param, T: Copy + 'static> Query<'_, (&'param T,)> {
 
 impl<'param, T: Copy + 'static> Query<'_, (&'param mut T,)> {
     pub fn each(&self, f: impl for<'row> FnMut(<(&'param mut T,) as QueryParam>::Item<'row>)) {
+        each_query(self, f);
+    }
+}
+
+impl<'param, T: Copy + 'static, U: Copy + 'static> Query<'_, (&'param T, &'param U)> {
+    pub fn each(
+        &self,
+        f: impl for<'row> FnMut(<(&'param T, &'param U) as QueryParam>::Item<'row>),
+    ) {
         each_query(self, f);
     }
 }

@@ -33,6 +33,27 @@ fn query_each_updates_matching_entities() {
     });
 }
 
+// Covers readonly query iteration over two component fields.
+#[test]
+fn query_each_reads_two_components() {
+    let world = World::new();
+    world
+        .entity()
+        .set(Position { x: 10.0, y: 20.0 })
+        .set(Velocity { x: 1.0, y: 2.0 });
+
+    let mut seen = Vec::new();
+    let query = world.query::<(&Position, &Velocity)>().build();
+    query.each(|(position, velocity)| {
+        seen.push((*position, *velocity));
+    });
+
+    assert_eq!(
+        seen,
+        vec![(Position { x: 10.0, y: 20.0 }, Velocity { x: 1.0, y: 2.0 })]
+    );
+}
+
 // Covers query mutable borrows rejecting reentrant shared entity access.
 #[test]
 fn query_each_rejects_shared_get_during_mutable_field() {
@@ -81,6 +102,24 @@ fn query_each_rejects_mutable_get_during_shared_field() {
     });
 }
 
+// Covers query row borrows rejecting structural mutation of the same entity.
+#[test]
+fn query_each_rejects_set_during_shared_field() {
+    let world = World::new();
+    let entity = world.entity().set(Position { x: 1.0, y: 2.0 });
+
+    let query = world.query::<(&Position,)>().build();
+    let result = catch_unwind(AssertUnwindSafe(|| {
+        query.each(|(position,)| {
+            assert_eq!(*position, Position { x: 1.0, y: 2.0 });
+            entity.set(Velocity { x: 3.0, y: 4.0 });
+        });
+    }));
+
+    assert!(result.is_err());
+    assert!(!entity.has::<Velocity>());
+}
+
 // Covers rejecting duplicate component fields before query iteration starts.
 #[test]
 fn query_build_rejects_duplicate_components() {
@@ -88,6 +127,18 @@ fn query_build_rejects_duplicate_components() {
 
     let result = catch_unwind(AssertUnwindSafe(|| {
         world.query::<(&mut Position, &Position)>().build();
+    }));
+
+    assert!(result.is_err());
+}
+
+// Covers rejecting duplicate readonly component fields before query iteration starts.
+#[test]
+fn query_build_rejects_duplicate_readonly_components() {
+    let world = World::new();
+
+    let result = catch_unwind(AssertUnwindSafe(|| {
+        world.query::<(&Position, &Position)>().build();
     }));
 
     assert!(result.is_err());

@@ -43,6 +43,17 @@ impl<'world, 'param, T: Copy + 'static> SystemBuilder<'world, (&'param mut T,)> 
 }
 
 impl<'world, 'param, T: Copy + 'static, U: Copy + 'static>
+    SystemBuilder<'world, (&'param T, &'param U)>
+{
+    pub fn each(
+        self,
+        f: impl for<'row> FnMut(<(&'param T, &'param U) as QueryParam>::Item<'row>) + 'static,
+    ) -> System<'world, (&'param T, &'param U)> {
+        build_system::<(&'param T, &'param U), _>(self.world, f)
+    }
+}
+
+impl<'world, 'param, T: Copy + 'static, U: Copy + 'static>
     SystemBuilder<'world, (&'param mut T, &'param U)>
 {
     pub fn each(
