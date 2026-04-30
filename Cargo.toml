@@ -1,7 +1,14 @@
 [workspace]
-members = []
+members = [
+    "crates/soul-ecs-sys",
+    "crates/soul-ecs",
+]
 resolver = "2"
 
 [workspace.package]
 edition = "2021"
 license = "MIT"
+
+[workspace.dependencies]
+cc = "1"
+soul-ecs-sys = { path = "crates/soul-ecs-sys" }
