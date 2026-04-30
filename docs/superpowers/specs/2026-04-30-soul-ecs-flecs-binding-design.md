@@ -152,11 +152,13 @@ entity.get_mut::<Position>(|position| {
 
 ### Component
 
-Rust component 以普通 `'static` 类型表示。第一版要求 component 类型满足：
+Rust component 以普通 Rust 类型表示。第一版通过 flecs 的按字节 set/get 路径存储组件，因此要求 component 类型满足：
 
 ```rust
-T: 'static
+T: Copy + 'static
 ```
+
+这个限制避免把带析构逻辑的 Rust 类型交给 flecs C 存储后产生未定义行为。后续支持非 `Copy` component 时，必须先设计并实现 component lifecycle hooks。
 
 注册方式采用按需注册：
 
