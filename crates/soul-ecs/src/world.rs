@@ -6,6 +6,7 @@ pub struct World {
 
 impl World {
     pub fn new() -> Self {
+        // SAFETY: ecs_init creates a new flecs world and returns ownership to the caller.
         let raw = unsafe { sys::ecs_init() };
         assert!(!raw.is_null(), "failed to initialize flecs world");
         Self { raw }
@@ -25,6 +26,7 @@ impl Default for World {
 impl Drop for World {
     fn drop(&mut self) {
         if !self.raw.is_null() {
+            // SAFETY: self.raw is a valid, live flecs world uniquely owned by World and has not been finalized before.
             let result = unsafe { sys::ecs_fini(self.raw) };
             debug_assert_eq!(result, 0);
             self.raw = std::ptr::null_mut();

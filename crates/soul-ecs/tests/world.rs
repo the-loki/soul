@@ -5,4 +5,7 @@ use soul_ecs::World;
 fn creates_and_drops_world() {
     let world = World::new();
     assert!(!world.as_ptr().is_null());
+
+    let default_world = World::default();
+    assert!(!default_world.as_ptr().is_null());
 }
