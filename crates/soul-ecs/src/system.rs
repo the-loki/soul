@@ -185,7 +185,6 @@ where
             // Panics from ctx_free would otherwise unwind through a C ABI cleanup callback.
             // There is no Rust caller that can resume the panic here, so abort to preserve
             // the no-unwind boundary contract.
-            eprintln!("soul-ecs: system context cleanup panicked; aborting");
             std::process::abort();
         }
     }
