@@ -2,12 +2,14 @@ use std::cell::RefCell;
 
 use soul_ecs_sys as sys;
 
+use crate::borrow::{BorrowTracker, ComponentBorrowGuard};
 use crate::entity::Entity;
 use crate::registry::{ComponentInfo, Registry};
 
 pub struct World {
     raw: *mut sys::ecs_world_t,
     registry: RefCell<Registry>,
+    borrows: RefCell<BorrowTracker>,
 }
 
 impl World {
@@ -18,6 +20,7 @@ impl World {
         Self {
             raw,
             registry: RefCell::new(Registry::default()),
+            borrows: RefCell::new(BorrowTracker::default()),
         }
     }
 
@@ -34,6 +37,23 @@ impl World {
 
     pub(crate) fn component_info<T: Copy + 'static>(&self) -> ComponentInfo {
         self.registry.borrow_mut().component::<T>(self.raw)
+    }
+
+    pub(crate) fn borrow_component(
+        &self,
+        entity: sys::ecs_entity_t,
+        component: sys::ecs_id_t,
+    ) -> ComponentBorrowGuard<'_> {
+        ComponentBorrowGuard::shared(&self.borrows, entity, component)
+    }
+
+    pub(crate) fn borrow_component_mut(
+        &self,
+        entity: sys::ecs_entity_t,
+        component: sys::ecs_id_t,
+        notify_modified: bool,
+    ) -> ComponentBorrowGuard<'_> {
+        ComponentBorrowGuard::mutable(&self.borrows, self.raw, entity, component, notify_modified)
     }
 }
 

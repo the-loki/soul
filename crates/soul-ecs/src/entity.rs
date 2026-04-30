@@ -1,3 +1,5 @@
+use std::mem;
+
 use soul_ecs_sys as sys;
 
 use crate::world::World;
@@ -18,14 +20,24 @@ impl<'world> Entity<'world> {
     }
 
     pub fn add<T: Copy + 'static>(self) -> Self {
+        assert!(
+            mem::size_of::<T>() == 0,
+            "add can only be used with zero-sized tag components; use set for data components"
+        );
         let info = self.world.component_info::<T>();
+        let _guard = self.world.borrow_component_mut(self.raw, info.id, false);
         // SAFETY: self.raw is an entity created in this world, and info.id is registered for the same world.
         unsafe { sys::ecs_add_id(self.world.as_ptr(), self.raw, info.id) };
         self
     }
 
     pub fn set<T: Copy + 'static>(self, value: T) -> Self {
+        if mem::size_of::<T>() == 0 {
+            return self.add::<T>();
+        }
+
         let info = self.world.component_info::<T>();
+        let _guard = self.world.borrow_component_mut(self.raw, info.id, false);
         // SAFETY: self.raw is an entity created in this world, info.id is registered for T,
         // and value points to a valid T with the size passed to flecs for the duration of the call.
         unsafe {
@@ -51,6 +63,7 @@ impl<'world> Entity<'world> {
         // SAFETY: self.raw is an entity created in this world, and info.id is registered for T.
         let ptr = unsafe { sys::ecs_get_id(self.world.as_ptr(), self.raw, info.id) };
         assert!(!ptr.is_null(), "component does not exist on entity");
+        let _guard = self.world.borrow_component(self.raw, info.id);
         unsafe {
             // SAFETY: flecs returned a non-null pointer for component T on this entity.
             f(&*(ptr.cast::<T>()));
@@ -62,16 +75,16 @@ impl<'world> Entity<'world> {
         // SAFETY: self.raw is an entity created in this world, and info.id is registered for T.
         let ptr = unsafe { sys::ecs_get_mut_id(self.world.as_ptr(), self.raw, info.id) };
         assert!(!ptr.is_null(), "component does not exist on entity");
+        let _guard = self.world.borrow_component_mut(self.raw, info.id, true);
         unsafe {
             // SAFETY: flecs returned a unique mutable pointer for component T on this entity.
             f(&mut *(ptr.cast::<T>()));
         }
-        // SAFETY: the component was retrieved mutably from this entity and may have been modified.
-        unsafe { sys::ecs_modified_id(self.world.as_ptr(), self.raw, info.id) };
     }
 
     pub fn remove<T: Copy + 'static>(self) -> Self {
         let info = self.world.component_info::<T>();
+        let _guard = self.world.borrow_component_mut(self.raw, info.id, false);
         // SAFETY: self.raw is an entity created in this world, and info.id is registered for the same world.
         unsafe { sys::ecs_remove_id(self.world.as_ptr(), self.raw, info.id) };
         self

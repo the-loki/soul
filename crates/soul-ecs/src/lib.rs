@@ -1,3 +1,4 @@
+mod borrow;
 mod entity;
 mod registry;
 mod world;

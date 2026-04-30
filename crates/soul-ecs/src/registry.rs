@@ -26,22 +26,21 @@ impl Registry {
             return *info;
         }
 
-        let name = CString::new(type_name::<T>()).expect("component type name contains nul byte");
-        // SAFETY: world is the live flecs world owned by World, and name is a valid C string for this call.
-        let id = unsafe {
-            sys::soul_ecs_component_init(
-                world,
-                name.as_ptr(),
-                mem::size_of::<T>(),
-                mem::align_of::<T>(),
-            )
+        let size = mem::size_of::<T>();
+        let id = if size == 0 {
+            // SAFETY: world is the live flecs world owned by World.
+            unsafe { sys::ecs_new(world) }
+        } else {
+            let name =
+                CString::new(type_name::<T>()).expect("component type name contains nul byte");
+            // SAFETY: world is the live flecs world owned by World, and name is a valid C string for this call.
+            unsafe {
+                sys::soul_ecs_component_init(world, name.as_ptr(), size, mem::align_of::<T>())
+            }
         };
         assert_ne!(id, 0, "failed to register component");
 
-        let info = ComponentInfo {
-            id,
-            size: mem::size_of::<T>(),
-        };
+        let info = ComponentInfo { id, size };
         self.components.insert(type_id, info);
         info
     }
