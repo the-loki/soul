@@ -24,8 +24,8 @@ impl<'world> Entity<'world> {
             mem::size_of::<T>() == 0,
             "add can only be used with zero-sized tag components; use set for data components"
         );
-        let info = self.world.component_info::<T>();
         self.world.assert_can_mutate_structure(self.raw);
+        let info = self.world.component_info::<T>();
         let _guard = self.world.borrow_component_mut(self.raw, info.id, false);
         // SAFETY: self.raw is an entity created in this world, and info.id is registered for the same world.
         unsafe { sys::ecs_add_id(self.world.as_ptr(), self.raw, info.id) };
@@ -34,11 +34,12 @@ impl<'world> Entity<'world> {
 
     pub fn set<T: Copy + 'static>(self, value: T) -> Self {
         if mem::size_of::<T>() == 0 {
+            self.world.assert_can_mutate_structure(self.raw);
             return self.add::<T>();
         }
 
-        let info = self.world.component_info::<T>();
         self.world.assert_can_mutate_structure(self.raw);
+        let info = self.world.component_info::<T>();
         let _guard = self.world.borrow_component_mut(self.raw, info.id, false);
         // SAFETY: self.raw is an entity created in this world, info.id is registered for T,
         // and value points to a valid T with the size passed to flecs for the duration of the call.
@@ -85,8 +86,8 @@ impl<'world> Entity<'world> {
     }
 
     pub fn remove<T: Copy + 'static>(self) -> Self {
-        let info = self.world.component_info::<T>();
         self.world.assert_can_mutate_structure(self.raw);
+        let info = self.world.component_info::<T>();
         let _guard = self.world.borrow_component_mut(self.raw, info.id, false);
         // SAFETY: self.raw is an entity created in this world, and info.id is registered for the same world.
         unsafe { sys::ecs_remove_id(self.world.as_ptr(), self.raw, info.id) };

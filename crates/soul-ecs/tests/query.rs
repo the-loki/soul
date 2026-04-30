@@ -13,6 +13,13 @@ struct Velocity {
     y: f32,
 }
 
+fn next_entity_id_after_position_query() -> u64 {
+    let world = World::new();
+    let _entity = world.entity().set(Position { x: 1.0, y: 2.0 });
+    let _query = world.query::<(&Position,)>().build();
+    world.entity().id()
+}
+
 // Covers typed query iteration over mutable and readonly fields.
 #[test]
 fn query_each_updates_matching_entities() {
@@ -109,6 +116,7 @@ fn query_each_rejects_set_during_shared_field() {
     let entity = world.entity().set(Position { x: 1.0, y: 2.0 });
 
     let query = world.query::<(&Position,)>().build();
+    let expected_next_entity_id = next_entity_id_after_position_query();
     let result = catch_unwind(AssertUnwindSafe(|| {
         query.each(|(position,)| {
             assert_eq!(*position, Position { x: 1.0, y: 2.0 });
@@ -117,6 +125,7 @@ fn query_each_rejects_set_during_shared_field() {
     }));
 
     assert!(result.is_err());
+    assert_eq!(world.entity().id(), expected_next_entity_id);
     assert!(!entity.has::<Velocity>());
 }
 

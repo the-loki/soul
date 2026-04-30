@@ -15,6 +15,13 @@ struct Velocity {
     y: f32,
 }
 
+fn next_entity_id_after_position_system() -> u64 {
+    let world = World::new();
+    let _entity = world.entity().set(Position { x: 1.0, y: 2.0 });
+    world.system::<(&Position,)>().each(|_| {});
+    world.entity().id()
+}
+
 struct DropCounter {
     drops: Arc<AtomicUsize>,
 }
@@ -77,6 +84,7 @@ fn system_each_reads_two_components() {
 fn system_each_rejects_set_during_shared_field() {
     let world = Box::leak(Box::new(World::new()));
     let entity = world.entity().set(Position { x: 1.0, y: 2.0 });
+    let expected_next_entity_id = next_entity_id_after_position_system();
 
     world.system::<(&Position,)>().each(move |(position,)| {
         assert_eq!(*position, Position { x: 1.0, y: 2.0 });
@@ -88,6 +96,7 @@ fn system_each_rejects_set_during_shared_field() {
     }));
 
     assert!(result.is_err());
+    assert_eq!(world.entity().id(), expected_next_entity_id);
     assert!(!entity.has::<Velocity>());
 }
 

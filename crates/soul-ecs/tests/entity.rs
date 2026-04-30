@@ -16,6 +16,12 @@ struct Velocity {
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct Tag;
 
+fn next_entity_id_after_position_entity() -> u64 {
+    let world = World::new();
+    let _entity = world.entity().set(Position { x: 1.0, y: 2.0 });
+    world.entity().id()
+}
+
 // Covers set, has, get, get_mut, and remove for one component.
 #[test]
 fn entity_manages_single_component() {
@@ -122,6 +128,7 @@ fn entity_rejects_mutable_get_during_mutable_get() {
 fn entity_rejects_set_during_component_get() {
     let world = World::new();
     let entity = world.entity().set(Position { x: 1.0, y: 2.0 });
+    let expected_next_entity_id = next_entity_id_after_position_entity();
 
     let result = catch_unwind(AssertUnwindSafe(|| {
         entity.get::<Position>(|_| {
@@ -130,6 +137,7 @@ fn entity_rejects_set_during_component_get() {
     }));
 
     assert!(result.is_err());
+    assert_eq!(world.entity().id(), expected_next_entity_id);
     assert!(!entity.has::<Velocity>());
 }
 
@@ -146,6 +154,57 @@ fn entity_add_only_accepts_zero_sized_tag_components() {
     }));
 
     assert!(result.is_err());
+}
+
+// Covers structural add rejection before registering an unregistered tag.
+#[test]
+fn entity_rejects_add_during_component_get_without_registering_tag() {
+    let world = World::new();
+    let entity = world.entity().set(Position { x: 1.0, y: 2.0 });
+    let expected_next_entity_id = next_entity_id_after_position_entity();
+
+    let result = catch_unwind(AssertUnwindSafe(|| {
+        entity.get::<Position>(|_| {
+            entity.add::<Tag>();
+        });
+    }));
+
+    assert!(result.is_err());
+    assert_eq!(world.entity().id(), expected_next_entity_id);
+}
+
+// Covers zero-sized set rejection before delegating to tag registration.
+#[test]
+fn entity_rejects_tag_set_during_component_get_without_registering_tag() {
+    let world = World::new();
+    let entity = world.entity().set(Position { x: 1.0, y: 2.0 });
+    let expected_next_entity_id = next_entity_id_after_position_entity();
+
+    let result = catch_unwind(AssertUnwindSafe(|| {
+        entity.get::<Position>(|_| {
+            entity.set(Tag);
+        });
+    }));
+
+    assert!(result.is_err());
+    assert_eq!(world.entity().id(), expected_next_entity_id);
+}
+
+// Covers structural remove rejection before registering an unregistered component.
+#[test]
+fn entity_rejects_remove_during_component_get_without_registering_component() {
+    let world = World::new();
+    let entity = world.entity().set(Position { x: 1.0, y: 2.0 });
+    let expected_next_entity_id = next_entity_id_after_position_entity();
+
+    let result = catch_unwind(AssertUnwindSafe(|| {
+        entity.get::<Position>(|_| {
+            entity.remove::<Velocity>();
+        });
+    }));
+
+    assert!(result.is_err());
+    assert_eq!(world.entity().id(), expected_next_entity_id);
 }
 
 // Covers borrow cleanup and modified notification when get_mut unwinds.
