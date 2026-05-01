@@ -47,6 +47,30 @@ impl<'world, 'param, T: Copy + 'static, U: Copy + 'static>
     }
 }
 
+impl<'world, 'param, T: Copy + 'static, U: Copy + 'static, V: Copy + 'static>
+    QueryBuilder<'world, (&'param T, &'param U, &'param V)>
+{
+    pub fn build(self) -> Query<'world, (&'param T, &'param U, &'param V)> {
+        build_query(self.world)
+    }
+}
+
+impl<'world, 'param, T: Copy + 'static, U: Copy + 'static, V: Copy + 'static>
+    QueryBuilder<'world, (&'param mut T, &'param U, &'param V)>
+{
+    pub fn build(self) -> Query<'world, (&'param mut T, &'param U, &'param V)> {
+        build_query(self.world)
+    }
+}
+
+impl<'world, 'param, T: Copy + 'static, U: Copy + 'static, V: Copy + 'static>
+    QueryBuilder<'world, (&'param T, &'param mut U, &'param mut V)>
+{
+    pub fn build(self) -> Query<'world, (&'param T, &'param mut U, &'param mut V)> {
+        build_query(self.world)
+    }
+}
+
 fn build_query<P>(world: &World) -> Query<'_, P>
 where
     P: QueryParamInternal,
@@ -109,6 +133,39 @@ impl<'param, T: Copy + 'static, U: Copy + 'static> Query<'_, (&'param mut T, &'p
     pub fn each(
         &self,
         f: impl for<'row> FnMut(<(&'param mut T, &'param U) as QueryParam>::Item<'row>),
+    ) {
+        each_query(self, f);
+    }
+}
+
+impl<'param, T: Copy + 'static, U: Copy + 'static, V: Copy + 'static>
+    Query<'_, (&'param T, &'param U, &'param V)>
+{
+    pub fn each(
+        &self,
+        f: impl for<'row> FnMut(<(&'param T, &'param U, &'param V) as QueryParam>::Item<'row>),
+    ) {
+        each_query(self, f);
+    }
+}
+
+impl<'param, T: Copy + 'static, U: Copy + 'static, V: Copy + 'static>
+    Query<'_, (&'param mut T, &'param U, &'param V)>
+{
+    pub fn each(
+        &self,
+        f: impl for<'row> FnMut(<(&'param mut T, &'param U, &'param V) as QueryParam>::Item<'row>),
+    ) {
+        each_query(self, f);
+    }
+}
+
+impl<'param, T: Copy + 'static, U: Copy + 'static, V: Copy + 'static>
+    Query<'_, (&'param T, &'param mut U, &'param mut V)>
+{
+    pub fn each(
+        &self,
+        f: impl for<'row> FnMut(<(&'param T, &'param mut U, &'param mut V) as QueryParam>::Item<'row>),
     ) {
         each_query(self, f);
     }

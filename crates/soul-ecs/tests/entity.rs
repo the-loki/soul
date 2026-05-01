@@ -290,3 +290,23 @@ fn entity_get_mut_releases_borrow_after_panic() {
         assert_eq!(*position, Position { x: 5.0, y: 8.0 });
     });
 }
+
+// Covers entity destruction removing the entity from typed queries.
+#[test]
+fn entity_destruct_removes_entity_from_queries() {
+    let world = World::new();
+    let entity = world
+        .entity()
+        .set(Position { x: 1.0, y: 2.0 })
+        .set(Velocity { x: 3.0, y: 4.0 });
+
+    entity.destruct();
+
+    let query = world.query::<(&Position, &Velocity)>().build();
+    let mut count = 0;
+    query.each(|_| {
+        count += 1;
+    });
+
+    assert_eq!(count, 0);
+}

@@ -26,6 +26,8 @@ extern "C" {
     pub fn ecs_fini(world: *mut ecs_world_t) -> i32;
     pub fn ecs_progress(world: *mut ecs_world_t, delta_time: ecs_ftime_t) -> bool;
     pub fn ecs_new(world: *mut ecs_world_t) -> ecs_entity_t;
+    pub fn ecs_delete(world: *mut ecs_world_t, entity: ecs_entity_t);
+    pub fn ecs_is_alive(world: *const ecs_world_t, entity: ecs_entity_t) -> bool;
     pub fn ecs_add_id(world: *mut ecs_world_t, entity: ecs_entity_t, id: ecs_id_t);
     pub fn ecs_remove_id(world: *mut ecs_world_t, entity: ecs_entity_t, id: ecs_id_t);
     pub fn ecs_has_id(world: *const ecs_world_t, entity: ecs_entity_t, id: ecs_id_t) -> bool;

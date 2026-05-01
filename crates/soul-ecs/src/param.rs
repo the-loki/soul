@@ -289,6 +289,160 @@ impl<T: Copy + 'static, U: Copy + 'static> QueryParamInternal for (&mut T, &U) {
     }
 }
 
+impl<T: Copy + 'static, U: Copy + 'static, V: Copy + 'static> QueryParam for (&T, &U, &V) {
+    type Item<'row> = (&'row T, &'row U, &'row V);
+}
+
+impl<T: Copy + 'static, U: Copy + 'static, V: Copy + 'static> QueryParamInternal for (&T, &U, &V) {
+    fn terms(world: &World) -> Vec<Term> {
+        vec![
+            Term::shared::<T>(world),
+            Term::shared::<U>(world),
+            Term::shared::<V>(world),
+        ]
+    }
+
+    fn borrow_row(
+        borrows: &BorrowContext,
+        entity: sys::ecs_entity_t,
+        terms: &[Term],
+    ) -> QueryBorrowGuards {
+        let mut guards = QueryBorrowGuards::new();
+        guards.push(borrows, entity, terms[0]);
+        guards.push(borrows, entity, terms[1]);
+        guards.push(borrows, entity, terms[2]);
+        guards
+    }
+
+    unsafe fn fetch_row<'row>(
+        iter: *const sys::soul_ecs_query_iter_t,
+        row: i32,
+    ) -> <Self as QueryParam>::Item<'row> {
+        // SAFETY: Query::each only calls this for matching rows after acquiring row guards.
+        (
+            unsafe { Field::<T>::from_query_iter(iter, row, 0).shared() },
+            unsafe { Field::<U>::from_query_iter(iter, row, 1).shared() },
+            unsafe { Field::<V>::from_query_iter(iter, row, 2).shared() },
+        )
+    }
+
+    unsafe fn fetch_system_row<'row>(
+        iter: *const sys::ecs_iter_t,
+        row: i32,
+    ) -> <Self as QueryParam>::Item<'row> {
+        // SAFETY: the system trampoline calls this for matching rows after acquiring row guards.
+        (
+            unsafe { Field::<T>::from_system_iter(iter, row, 0).shared() },
+            unsafe { Field::<U>::from_system_iter(iter, row, 1).shared() },
+            unsafe { Field::<V>::from_system_iter(iter, row, 2).shared() },
+        )
+    }
+}
+
+impl<T: Copy + 'static, U: Copy + 'static, V: Copy + 'static> QueryParam for (&mut T, &U, &V) {
+    type Item<'row> = (&'row mut T, &'row U, &'row V);
+}
+
+impl<T: Copy + 'static, U: Copy + 'static, V: Copy + 'static> QueryParamInternal
+    for (&mut T, &U, &V)
+{
+    fn terms(world: &World) -> Vec<Term> {
+        vec![
+            Term::mutable::<T>(world),
+            Term::shared::<U>(world),
+            Term::shared::<V>(world),
+        ]
+    }
+
+    fn borrow_row(
+        borrows: &BorrowContext,
+        entity: sys::ecs_entity_t,
+        terms: &[Term],
+    ) -> QueryBorrowGuards {
+        let mut guards = QueryBorrowGuards::new();
+        guards.push(borrows, entity, terms[0]);
+        guards.push(borrows, entity, terms[1]);
+        guards.push(borrows, entity, terms[2]);
+        guards
+    }
+
+    unsafe fn fetch_row<'row>(
+        iter: *const sys::soul_ecs_query_iter_t,
+        row: i32,
+    ) -> <Self as QueryParam>::Item<'row> {
+        // SAFETY: Query::each only calls this for matching rows after acquiring row guards.
+        (
+            unsafe { Field::<T>::from_query_iter(iter, row, 0).mutable() },
+            unsafe { Field::<U>::from_query_iter(iter, row, 1).shared() },
+            unsafe { Field::<V>::from_query_iter(iter, row, 2).shared() },
+        )
+    }
+
+    unsafe fn fetch_system_row<'row>(
+        iter: *const sys::ecs_iter_t,
+        row: i32,
+    ) -> <Self as QueryParam>::Item<'row> {
+        // SAFETY: the system trampoline calls this for matching rows after acquiring row guards.
+        (
+            unsafe { Field::<T>::from_system_iter(iter, row, 0).mutable() },
+            unsafe { Field::<U>::from_system_iter(iter, row, 1).shared() },
+            unsafe { Field::<V>::from_system_iter(iter, row, 2).shared() },
+        )
+    }
+}
+
+impl<T: Copy + 'static, U: Copy + 'static, V: Copy + 'static> QueryParam for (&T, &mut U, &mut V) {
+    type Item<'row> = (&'row T, &'row mut U, &'row mut V);
+}
+
+impl<T: Copy + 'static, U: Copy + 'static, V: Copy + 'static> QueryParamInternal
+    for (&T, &mut U, &mut V)
+{
+    fn terms(world: &World) -> Vec<Term> {
+        vec![
+            Term::shared::<T>(world),
+            Term::mutable::<U>(world),
+            Term::mutable::<V>(world),
+        ]
+    }
+
+    fn borrow_row(
+        borrows: &BorrowContext,
+        entity: sys::ecs_entity_t,
+        terms: &[Term],
+    ) -> QueryBorrowGuards {
+        let mut guards = QueryBorrowGuards::new();
+        guards.push(borrows, entity, terms[0]);
+        guards.push(borrows, entity, terms[1]);
+        guards.push(borrows, entity, terms[2]);
+        guards
+    }
+
+    unsafe fn fetch_row<'row>(
+        iter: *const sys::soul_ecs_query_iter_t,
+        row: i32,
+    ) -> <Self as QueryParam>::Item<'row> {
+        // SAFETY: Query::each only calls this for matching rows after acquiring row guards.
+        (
+            unsafe { Field::<T>::from_query_iter(iter, row, 0).shared() },
+            unsafe { Field::<U>::from_query_iter(iter, row, 1).mutable() },
+            unsafe { Field::<V>::from_query_iter(iter, row, 2).mutable() },
+        )
+    }
+
+    unsafe fn fetch_system_row<'row>(
+        iter: *const sys::ecs_iter_t,
+        row: i32,
+    ) -> <Self as QueryParam>::Item<'row> {
+        // SAFETY: the system trampoline calls this for matching rows after acquiring row guards.
+        (
+            unsafe { Field::<T>::from_system_iter(iter, row, 0).shared() },
+            unsafe { Field::<U>::from_system_iter(iter, row, 1).mutable() },
+            unsafe { Field::<V>::from_system_iter(iter, row, 2).mutable() },
+        )
+    }
+}
+
 pub(crate) fn validate_unique_terms(terms: &[Term], parameter_kind: &str) {
     for (index, term) in terms.iter().enumerate() {
         for other in &terms[index + 1..] {

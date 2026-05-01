@@ -19,6 +19,12 @@ impl<'world> Entity<'world> {
         self.raw
     }
 
+    pub fn destruct(self) {
+        self.world.assert_can_mutate_structure(self.raw);
+        // SAFETY: self.raw is an entity created in this world and deletion is routed through the owning world.
+        unsafe { sys::ecs_delete(self.world.as_ptr(), self.raw) };
+    }
+
     pub fn add<T: Copy + 'static>(self) -> Self {
         assert!(
             mem::size_of::<T>() == 0,

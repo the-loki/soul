@@ -64,6 +64,41 @@ impl<'world, 'param, T: Copy + 'static, U: Copy + 'static>
     }
 }
 
+impl<'world, 'param, T: Copy + 'static, U: Copy + 'static, V: Copy + 'static>
+    SystemBuilder<'world, (&'param T, &'param U, &'param V)>
+{
+    pub fn each(
+        self,
+        f: impl for<'row> FnMut(<(&'param T, &'param U, &'param V) as QueryParam>::Item<'row>) + 'static,
+    ) -> System<'world, (&'param T, &'param U, &'param V)> {
+        build_system::<(&'param T, &'param U, &'param V), _>(self.world, f)
+    }
+}
+
+impl<'world, 'param, T: Copy + 'static, U: Copy + 'static, V: Copy + 'static>
+    SystemBuilder<'world, (&'param mut T, &'param U, &'param V)>
+{
+    pub fn each(
+        self,
+        f: impl for<'row> FnMut(<(&'param mut T, &'param U, &'param V) as QueryParam>::Item<'row>)
+            + 'static,
+    ) -> System<'world, (&'param mut T, &'param U, &'param V)> {
+        build_system::<(&'param mut T, &'param U, &'param V), _>(self.world, f)
+    }
+}
+
+impl<'world, 'param, T: Copy + 'static, U: Copy + 'static, V: Copy + 'static>
+    SystemBuilder<'world, (&'param T, &'param mut U, &'param mut V)>
+{
+    pub fn each(
+        self,
+        f: impl for<'row> FnMut(<(&'param T, &'param mut U, &'param mut V) as QueryParam>::Item<'row>)
+            + 'static,
+    ) -> System<'world, (&'param T, &'param mut U, &'param mut V)> {
+        build_system::<(&'param T, &'param mut U, &'param mut V), _>(self.world, f)
+    }
+}
+
 fn build_system<'world, P, F>(world: &'world World, f: F) -> System<'world, P>
 where
     P: QueryParamInternal,

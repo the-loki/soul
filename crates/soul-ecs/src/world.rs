@@ -45,6 +45,16 @@ impl World {
         Entity::new(self, raw)
     }
 
+    pub fn entity_from_id(&self, id: sys::ecs_entity_t) -> Entity<'_> {
+        assert_ne!(id, 0, "entity id must not be zero");
+        // SAFETY: self.raw is a valid, live flecs world owned by World.
+        assert!(
+            unsafe { sys::ecs_is_alive(self.raw, id) },
+            "entity id is not alive in this world"
+        );
+        Entity::new(self, id)
+    }
+
     pub fn query<P: QueryParam>(&self) -> QueryBuilder<'_, P> {
         QueryBuilder::new(self)
     }
