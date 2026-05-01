@@ -2,6 +2,7 @@ use std::mem;
 
 use soul_ecs_sys as sys;
 
+use crate::observer::{build_entity_observer, EntityObserver};
 use crate::world::World;
 
 #[derive(Clone, Copy)]
@@ -98,5 +99,72 @@ impl<'world> Entity<'world> {
         // SAFETY: self.raw is an entity created in this world, and info.id is registered for the same world.
         unsafe { sys::ecs_remove_id(self.world.as_ptr(), self.raw, info.id) };
         self
+    }
+
+    pub fn observe<E: Copy + 'static>(
+        &self,
+        f: impl for<'entity> FnMut(Entity<'entity>) + 'static,
+    ) -> EntityObserver<'world> {
+        build_entity_observer::<E, _>(self.world, self.raw, f)
+    }
+
+    pub fn emit<E: Copy + 'static>(&self) {
+        let event = self.world.component_info::<E>().id;
+        let ids: [sys::ecs_id_t; 0] = [];
+        // SAFETY: self.raw is alive in this world, event is registered in this world,
+        // and the empty ids list is valid for the duration of the call.
+        unsafe {
+            sys::soul_ecs_emit_event(self.world.as_ptr(), event, self.raw, ids.as_ptr(), 0);
+        }
+        self.world.resume_pending_panic();
+    }
+
+    pub fn enqueue<E: Copy + 'static>(&self) {
+        let event = self.world.component_info::<E>().id;
+        let ids: [sys::ecs_id_t; 0] = [];
+        // SAFETY: self.raw is alive in this world, event is registered in this world,
+        // and the empty ids list is valid for the duration of the call.
+        unsafe {
+            sys::soul_ecs_enqueue_event(self.world.as_ptr(), event, self.raw, ids.as_ptr(), 0);
+        }
+        self.world.resume_pending_panic();
+    }
+
+    pub fn emit2<E: Copy + 'static, T: Copy + 'static, U: Copy + 'static>(&self) {
+        let event = self.world.component_info::<E>().id;
+        let first = self.world.component_info::<T>().id;
+        let second = self.world.component_info::<U>().id;
+        let ids = [first, second];
+        // SAFETY: self.raw is alive in this world, event and ids are registered in this world,
+        // and ids is valid for the duration of the call.
+        unsafe {
+            sys::soul_ecs_emit_event(
+                self.world.as_ptr(),
+                event,
+                self.raw,
+                ids.as_ptr(),
+                ids.len().try_into().expect("event id count exceeds i32"),
+            );
+        }
+        self.world.resume_pending_panic();
+    }
+
+    pub fn enqueue2<E: Copy + 'static, T: Copy + 'static, U: Copy + 'static>(&self) {
+        let event = self.world.component_info::<E>().id;
+        let first = self.world.component_info::<T>().id;
+        let second = self.world.component_info::<U>().id;
+        let ids = [first, second];
+        // SAFETY: self.raw is alive in this world, event and ids are registered in this world,
+        // and ids is valid for the duration of the call.
+        unsafe {
+            sys::soul_ecs_enqueue_event(
+                self.world.as_ptr(),
+                event,
+                self.raw,
+                ids.as_ptr(),
+                ids.len().try_into().expect("event id count exceeds i32"),
+            );
+        }
+        self.world.resume_pending_panic();
     }
 }

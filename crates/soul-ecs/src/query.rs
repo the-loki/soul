@@ -2,6 +2,7 @@ use std::marker::PhantomData;
 
 use soul_ecs_sys as sys;
 
+use crate::entity::Entity;
 use crate::param::{validate_unique_terms, QueryParam, QueryParamInternal, Term};
 use crate::world::World;
 
@@ -127,6 +128,13 @@ impl<'param, T: Copy + 'static, U: Copy + 'static> Query<'_, (&'param T, &'param
     ) {
         each_query(self, f);
     }
+
+    pub fn each_entity<'world>(
+        &'world self,
+        f: impl for<'row> FnMut(Entity<'world>, <(&'param T, &'param U) as QueryParam>::Item<'row>),
+    ) {
+        each_query_entity(self, f);
+    }
 }
 
 impl<'param, T: Copy + 'static, U: Copy + 'static> Query<'_, (&'param mut T, &'param U)> {
@@ -175,6 +183,24 @@ fn each_query<P>(query: &Query<'_, P>, mut f: impl for<'row> FnMut(P::Item<'row>
 where
     P: QueryParamInternal,
 {
+    each_query_row(query, |_, item| f(item));
+}
+
+fn each_query_entity<'world, P>(
+    query: &'world Query<'_, P>,
+    f: impl for<'row> FnMut(Entity<'world>, P::Item<'row>),
+) where
+    P: QueryParamInternal,
+{
+    each_query_row(query, f);
+}
+
+fn each_query_row<'query, P>(
+    query: &'query Query<'_, P>,
+    mut f: impl for<'row> FnMut(Entity<'query>, P::Item<'row>),
+) where
+    P: QueryParamInternal,
+{
     // SAFETY: query.raw is a live query created for query.world.
     let iter = unsafe { sys::soul_ecs_query_iter(query.world.as_ptr(), query.raw) };
     assert!(!iter.is_null(), "failed to create query iterator");
@@ -194,7 +220,7 @@ where
             let _guards = P::borrow_row(&query.world.borrow_context(), entity, &query.terms);
             // SAFETY: row is in bounds, field terms match P, and borrow guards are active.
             let item = unsafe { P::fetch_row(iter, row) };
-            f(item);
+            f(Entity::new(query.world, entity), item);
         }
     }
 }

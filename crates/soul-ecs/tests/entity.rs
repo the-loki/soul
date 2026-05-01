@@ -24,6 +24,9 @@ struct UnregisteredComponent {
     value: i32,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct EmptyEvent;
+
 fn next_entity_id_after_position_entity() -> u64 {
     let world = World::new();
     let _entity = world.entity().set(Position { x: 1.0, y: 2.0 });
@@ -309,4 +312,85 @@ fn entity_destruct_removes_entity_from_queries() {
     });
 
     assert_eq!(count, 0);
+}
+
+// Covers typed observer callbacks for immediate custom event emission.
+#[test]
+fn entity_emit_invokes_typed_observer() {
+    let world = World::new();
+    let entity = world
+        .entity()
+        .set(Position { x: 1.0, y: 2.0 })
+        .set(Velocity { x: 3.0, y: 4.0 });
+    let hits = std::rc::Rc::new(std::cell::RefCell::new(0));
+    let observer_hits = std::rc::Rc::clone(&hits);
+
+    let _observer = world
+        .observer::<(&Position, &Velocity)>()
+        .event::<EmptyEvent>()
+        .each(move |(position, velocity)| {
+            assert_eq!(*position, Position { x: 1.0, y: 2.0 });
+            assert_eq!(*velocity, Velocity { x: 3.0, y: 4.0 });
+            *observer_hits.borrow_mut() += 1;
+        });
+
+    entity.emit2::<EmptyEvent, Position, Velocity>();
+
+    assert_eq!(*hits.borrow(), 1);
+}
+
+// Covers entity-scoped observers for empty event emission.
+#[test]
+fn entity_observe_invokes_entity_scoped_observer() {
+    let world = World::new();
+    let entity = world
+        .entity()
+        .set(Position { x: 1.0, y: 2.0 })
+        .set(Velocity { x: 3.0, y: 4.0 });
+    let other = world
+        .entity()
+        .set(Position { x: 5.0, y: 6.0 })
+        .set(Velocity { x: 7.0, y: 8.0 });
+    let hits = std::rc::Rc::new(std::cell::RefCell::new(0));
+    let observer_hits = std::rc::Rc::clone(&hits);
+
+    let _observer = entity.observe::<EmptyEvent>(move |source| {
+        source.get::<Position>(|position| {
+            assert_eq!(*position, Position { x: 1.0, y: 2.0 });
+        });
+        *observer_hits.borrow_mut() += 1;
+    });
+
+    other.emit::<EmptyEvent>();
+    entity.emit::<EmptyEvent>();
+
+    assert_eq!(*hits.borrow(), 1);
+}
+
+// Covers deferred custom event enqueue flushed by defer_end.
+#[test]
+fn entity_enqueue_invokes_typed_observer_on_defer_end() {
+    let world = World::new();
+    let entity = world
+        .entity()
+        .set(Position { x: 1.0, y: 2.0 })
+        .set(Velocity { x: 3.0, y: 4.0 });
+    let hits = std::rc::Rc::new(std::cell::RefCell::new(0));
+    let observer_hits = std::rc::Rc::clone(&hits);
+
+    let _observer = world
+        .observer::<(&Position, &Velocity)>()
+        .event::<EmptyEvent>()
+        .each(move |(position, velocity)| {
+            assert_eq!(*position, Position { x: 1.0, y: 2.0 });
+            assert_eq!(*velocity, Velocity { x: 3.0, y: 4.0 });
+            *observer_hits.borrow_mut() += 1;
+        });
+
+    assert!(world.defer_begin());
+    entity.enqueue2::<EmptyEvent, Position, Velocity>();
+    assert_eq!(*hits.borrow(), 0);
+    assert!(world.defer_end());
+
+    assert_eq!(*hits.borrow(), 1);
 }

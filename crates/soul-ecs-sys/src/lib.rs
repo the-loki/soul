@@ -28,6 +28,8 @@ extern "C" {
     pub fn ecs_new(world: *mut ecs_world_t) -> ecs_entity_t;
     pub fn ecs_delete(world: *mut ecs_world_t, entity: ecs_entity_t);
     pub fn ecs_is_alive(world: *const ecs_world_t, entity: ecs_entity_t) -> bool;
+    pub fn ecs_defer_begin(world: *mut ecs_world_t) -> bool;
+    pub fn ecs_defer_end(world: *mut ecs_world_t) -> bool;
     pub fn ecs_add_id(world: *mut ecs_world_t, entity: ecs_entity_t, id: ecs_id_t);
     pub fn ecs_remove_id(world: *mut ecs_world_t, entity: ecs_entity_t, id: ecs_id_t);
     pub fn ecs_has_id(world: *const ecs_world_t, entity: ecs_entity_t, id: ecs_id_t) -> bool;
@@ -57,6 +59,14 @@ extern "C" {
         size: usize,
         alignment: usize,
     ) -> ecs_entity_t;
+    pub fn soul_ecs_bulk_init(
+        world: *mut ecs_world_t,
+        ids: *const ecs_id_t,
+        data: *mut *mut c_void,
+        id_count: i32,
+        entity_count: i32,
+        out: *mut ecs_entity_t,
+    ) -> bool;
     pub fn soul_ecs_query_init(
         world: *mut ecs_world_t,
         ids: *const ecs_id_t,
@@ -86,8 +96,41 @@ extern "C" {
         ctx: *mut c_void,
         ctx_free: ecs_ctx_free_t,
     ) -> ecs_entity_t;
+    pub fn soul_ecs_observer_init(
+        world: *mut ecs_world_t,
+        ids: *const ecs_id_t,
+        inouts: *const i16,
+        count: i32,
+        event: ecs_entity_t,
+        callback: ecs_iter_action_t,
+        ctx: *mut c_void,
+        ctx_free: ecs_ctx_free_t,
+    ) -> ecs_entity_t;
+    pub fn soul_ecs_entity_observer_init(
+        world: *mut ecs_world_t,
+        event: ecs_entity_t,
+        entity: ecs_entity_t,
+        callback: ecs_iter_action_t,
+        ctx: *mut c_void,
+        ctx_free: ecs_ctx_free_t,
+    ) -> ecs_entity_t;
+    pub fn soul_ecs_emit_event(
+        world: *mut ecs_world_t,
+        event: ecs_entity_t,
+        entity: ecs_entity_t,
+        ids: *const ecs_id_t,
+        count: i32,
+    );
+    pub fn soul_ecs_enqueue_event(
+        world: *mut ecs_world_t,
+        event: ecs_entity_t,
+        entity: ecs_entity_t,
+        ids: *const ecs_id_t,
+        count: i32,
+    );
     pub fn soul_ecs_iter_count(iter: *const ecs_iter_t) -> i32;
     pub fn soul_ecs_iter_field(iter: *const ecs_iter_t, size: usize, index: i8) -> *mut c_void;
     pub fn soul_ecs_iter_entity(iter: *const ecs_iter_t, row: i32) -> ecs_entity_t;
     pub fn soul_ecs_iter_ctx(iter: *const ecs_iter_t) -> *mut c_void;
+    pub fn soul_ecs_iter_field_src(iter: *const ecs_iter_t, index: i8) -> ecs_entity_t;
 }

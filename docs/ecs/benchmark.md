@@ -1,6 +1,6 @@
 # soul ECS 基准测试
 
-`soul-ecs` 的 benchmark 对照 `abeimler/ecs_benchmark` 中 flecs 相关 benchmark 的命名、输入规模和主要实体构造逻辑。当前 runner 使用 Rust 侧 Criterion，而不是原项目的 google/benchmark。
+`soul-ecs` 的 benchmark 对照 `abeimler/ecs_benchmark` 中 flecs 相关 benchmark 的命名、输入规模、实体构造逻辑和事件触发结构。当前 runner 使用 Rust 侧 Criterion，而不是原项目的 google/benchmark。
 
 ## 已复刻场景
 
@@ -25,17 +25,28 @@
 - `BM_IterateSingleComponent`
 - `BM_IterateTwoComponents`
 - `BM_IterateThreeComponentsWithMixedEntities`
+- `BM_EnqueueAndUpdateEventsViaObserverWithMixedEntities`
+- `BM_EmitAndUpdateEventsViaObserverWithMixedEntities`
 
-输入规模对齐原项目 `BEDefaultArguments`：从 `0` 到 `2_097_152`，按 2 倍递增。
+除 emit 事件场景外，输入规模对齐原项目 `BEDefaultArguments`：从 `0` 到 `2_097_152`，按 2 倍递增。`BM_EmitAndUpdateEventsViaObserverWithMixedEntities` 对齐原项目 `BESmallArguments`：从 `0` 到 `32_768`，按 2 倍递增。
 
 benchmark 内部实现了原项目 base 组件和系统逻辑的 Rust 版本，包括 position、velocity、data、player、health、damage、sprite、frame buffer 和 xoshiro128 随机数。
 
-## 差异与缺口
+## 绑定能力
 
-当前仍有两个差异：
+为避免 benchmark 绕过 `soul-ecs` 门面直接操作 raw flecs 指针，本轮补齐了以下 safe wrapper 能力：
 
-- `BM_CreateEntitiesInBulk` 和 `BM_CreateEmptyEntitiesInBulk` 使用 `soul-ecs` safe API 循环创建实体，没有绕过门面调用 flecs raw `ecs_bulk_init`。如果需要原项目 bulk 快路径语义，需要先在 `soul-ecs` 增加安全 bulk API。
-- 原项目 flecs observer/event 扩展中的 `BM_EnqueueAndUpdateEventsViaObserverWithMixedEntities` 和 `BM_EmitAndUpdateEventsViaObserverWithMixedEntities` 尚未复刻。原因是 `soul-ecs` 当前没有 observer/event API；不应在 `soul-ecs` benchmark 中直接绕过门面使用 raw flecs 指针伪造结果。
+- bulk 创建：`World::bulk_empty`、`World::bulk_with1`、`World::bulk_with2`、`World::bulk_with3`，底层绑定 flecs `ecs_bulk_init`。
+- observer/event：`World::observer().event().each(...)` 对齐 flecs world observer；`Entity::observe` 对齐 flecs C++ `e.observe<Event>` 的实体级 observer；`Entity::emit`、`Entity::emit2`、`Entity::enqueue`、`Entity::enqueue2` 对齐空事件和带 id 列表事件。
+- query entity row：`Query::each_entity` 用于事件 benchmark 中按 query 结果取得实体句柄。
+
+## 差异边界
+
+当前复刻的是 flecs 相关 benchmark 在 `soul-ecs` Rust 绑定层的等价实现，不是原 C++ 文件的逐行翻译。主要边界是：
+
+- runner 使用 Criterion，因此输出格式、统计模型和命令行参数不同于 google/benchmark。
+- 结果包含 `soul-ecs` safe wrapper、运行时借用检查、typed query/system/observer 封装和 FFI 调用成本。
+- Rust benchmark 的组件初始化通过 typed safe API 表达；bulk 场景底层已经走 flecs `ecs_bulk_init`。
 
 ## 运行方式
 

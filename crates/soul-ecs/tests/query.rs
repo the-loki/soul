@@ -64,6 +64,36 @@ fn query_each_reads_two_components() {
     );
 }
 
+// Covers readonly query iteration with the matching entity handle.
+#[test]
+fn query_each_entity_reads_components_and_entity_id() {
+    let world = World::new();
+    let entity = world
+        .entity()
+        .set(Position { x: 10.0, y: 20.0 })
+        .set(Velocity { x: 1.0, y: 2.0 });
+    world.entity().set(Position { x: 30.0, y: 40.0 });
+
+    let mut seen = Vec::new();
+    let query = world.query::<(&Position, &Velocity)>().build();
+    query.each_entity(|row_entity, (position, velocity)| {
+        assert_eq!(row_entity.id(), entity.id());
+        row_entity.get::<Position>(|same_position| {
+            assert_eq!(same_position, position);
+        });
+        seen.push((row_entity.id(), *position, *velocity));
+    });
+
+    assert_eq!(
+        seen,
+        vec![(
+            entity.id(),
+            Position { x: 10.0, y: 20.0 },
+            Velocity { x: 1.0, y: 2.0 }
+        )]
+    );
+}
+
 // Covers query mutable borrows rejecting reentrant shared entity access.
 #[test]
 fn query_each_rejects_shared_get_during_mutable_field() {

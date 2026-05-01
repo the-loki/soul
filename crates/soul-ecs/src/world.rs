@@ -1,5 +1,6 @@
 use std::any::Any;
 use std::cell::RefCell;
+use std::ffi::c_void;
 use std::panic::resume_unwind;
 use std::rc::Rc;
 
@@ -7,6 +8,7 @@ use soul_ecs_sys as sys;
 
 use crate::borrow::{BorrowContext, BorrowTracker, ComponentBorrowGuard};
 use crate::entity::Entity;
+use crate::observer::ObserverBuilder;
 use crate::param::QueryParam;
 use crate::query::QueryBuilder;
 use crate::registry::{ComponentInfo, Registry};
@@ -63,14 +65,79 @@ impl World {
         SystemBuilder::new(self)
     }
 
+    pub fn observer<P: QueryParam>(&self) -> ObserverBuilder<'_, P> {
+        ObserverBuilder::new(self)
+    }
+
+    pub fn bulk_empty(&self, count: usize) -> Vec<Entity<'_>> {
+        self.assert_no_active_component_borrows();
+        self.bulk_init(&[], std::ptr::null_mut(), count)
+    }
+
+    pub fn bulk_with1<T: Copy + Default + 'static>(&self, count: usize) -> Vec<Entity<'_>> {
+        self.assert_no_active_component_borrows();
+        let info = self.component_info::<T>();
+        let mut values = vec![T::default(); count];
+        let mut data = [values.as_mut_ptr().cast::<c_void>()];
+        self.bulk_init(&[info.id], data.as_mut_ptr(), count)
+    }
+
+    pub fn bulk_with2<T: Copy + Default + 'static, U: Copy + Default + 'static>(
+        &self,
+        count: usize,
+    ) -> Vec<Entity<'_>> {
+        self.assert_no_active_component_borrows();
+        let first = self.component_info::<T>();
+        let second = self.component_info::<U>();
+        let mut first_values = vec![T::default(); count];
+        let mut second_values = vec![U::default(); count];
+        let mut data = [
+            first_values.as_mut_ptr().cast::<c_void>(),
+            second_values.as_mut_ptr().cast::<c_void>(),
+        ];
+        self.bulk_init(&[first.id, second.id], data.as_mut_ptr(), count)
+    }
+
+    pub fn bulk_with3<
+        T: Copy + Default + 'static,
+        U: Copy + Default + 'static,
+        V: Copy + Default + 'static,
+    >(
+        &self,
+        count: usize,
+    ) -> Vec<Entity<'_>> {
+        self.assert_no_active_component_borrows();
+        let first = self.component_info::<T>();
+        let second = self.component_info::<U>();
+        let third = self.component_info::<V>();
+        let mut first_values = vec![T::default(); count];
+        let mut second_values = vec![U::default(); count];
+        let mut third_values = vec![V::default(); count];
+        let mut data = [
+            first_values.as_mut_ptr().cast::<c_void>(),
+            second_values.as_mut_ptr().cast::<c_void>(),
+            third_values.as_mut_ptr().cast::<c_void>(),
+        ];
+        self.bulk_init(&[first.id, second.id, third.id], data.as_mut_ptr(), count)
+    }
+
     pub fn progress(&self) -> bool {
         // SAFETY: self.raw is a valid, live flecs world owned by World.
         let progressed = unsafe { sys::ecs_progress(self.raw, 0.0) };
-        let pending_panic = self.pending_panic.borrow_mut().take();
-        if let Some(payload) = pending_panic {
-            resume_unwind(payload);
-        }
+        self.resume_pending_panic();
         progressed
+    }
+
+    pub fn defer_begin(&self) -> bool {
+        // SAFETY: self.raw is a valid, live flecs world owned by World.
+        unsafe { sys::ecs_defer_begin(self.raw) }
+    }
+
+    pub fn defer_end(&self) -> bool {
+        // SAFETY: self.raw is a valid, live flecs world owned by World.
+        let result = unsafe { sys::ecs_defer_end(self.raw) };
+        self.resume_pending_panic();
+        result
     }
 
     pub(crate) fn component_info<T: Copy + 'static>(&self) -> ComponentInfo {
@@ -119,6 +186,41 @@ impl World {
 
     pub(crate) fn panic_slot(&self) -> PanicSlot {
         Rc::clone(&self.pending_panic)
+    }
+
+    pub(crate) fn resume_pending_panic(&self) {
+        let pending_panic = self.pending_panic.borrow_mut().take();
+        if let Some(payload) = pending_panic {
+            resume_unwind(payload);
+        }
+    }
+
+    fn bulk_init(
+        &self,
+        ids: &[sys::ecs_id_t],
+        data: *mut *mut c_void,
+        count: usize,
+    ) -> Vec<Entity<'_>> {
+        let entity_count: i32 = count.try_into().expect("bulk entity count exceeds i32");
+        let id_count: i32 = ids
+            .len()
+            .try_into()
+            .expect("bulk component count exceeds i32");
+        let mut out = vec![0; count];
+        // SAFETY: self.raw is live, ids/data describe id_count entries for this call,
+        // and out has room for entity_count returned ids.
+        let ok = unsafe {
+            sys::soul_ecs_bulk_init(
+                self.raw,
+                ids.as_ptr(),
+                data,
+                id_count,
+                entity_count,
+                out.as_mut_ptr(),
+            )
+        };
+        assert!(ok, "failed to bulk create entities");
+        out.into_iter().map(|id| Entity::new(self, id)).collect()
     }
 }
 

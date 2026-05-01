@@ -152,6 +152,9 @@ impl Default for SpriteComponent {
     }
 }
 
+#[derive(Clone, Copy)]
+struct EmptyEvent;
+
 #[derive(Default)]
 struct ComponentsCounter {
     component_one_count: usize,
@@ -778,9 +781,8 @@ fn bench_entity_suite(c: &mut Criterion) {
             b.iter_batched(
                 World::new,
                 |world| {
-                    for _ in 0..count {
-                        black_box(create_minimal(&world));
-                    }
+                    let entities = world.bulk_with2::<PositionComponent, VelocityComponent>(count);
+                    black_box(entities);
                     black_box(world);
                 },
                 BatchSize::LargeInput,
@@ -793,9 +795,8 @@ fn bench_entity_suite(c: &mut Criterion) {
             b.iter_batched(
                 World::new,
                 |world| {
-                    for _ in 0..count {
-                        black_box(create_empty(&world));
-                    }
+                    let entities = world.bulk_empty(count);
+                    black_box(entities);
                     black_box(world);
                 },
                 BatchSize::LargeInput,
@@ -904,10 +905,84 @@ fn bench_extended_suite(c: &mut Criterion) {
     );
 }
 
+fn bench_event_suite(c: &mut Criterion) {
+    bench_with_default_inputs(
+        c,
+        "BM_EnqueueAndUpdateEventsViaObserverWithMixedEntities",
+        |group, count| {
+            group.bench_with_input(BenchmarkId::from_parameter(count), &count, |b, &count| {
+                let world = World::new();
+                let (ids, counter) = create_entities_with_mixed_components(&world, count);
+                let observer = world
+                    .observer::<(&PositionComponent, &VelocityComponent)>()
+                    .event::<EmptyEvent>()
+                    .each(|(position, velocity)| {
+                        black_box((position, velocity));
+                    });
+                let query = world
+                    .query::<(&PositionComponent, &VelocityComponent)>()
+                    .build();
+
+                b.iter(|| {
+                    black_box(world.defer_begin());
+                    query.each_entity(|entity, (position, velocity)| {
+                        black_box((position, velocity));
+                        entity.enqueue2::<EmptyEvent, PositionComponent, VelocityComponent>();
+                    });
+                    black_box(world.defer_end());
+                });
+
+                black_box_counter(&counter);
+                drop(query);
+                black_box((&world, &ids, &observer));
+                black_box(counter);
+            });
+        },
+    );
+
+    let mut group = c.benchmark_group("BM_EmitAndUpdateEventsViaObserverWithMixedEntities");
+    for count in [
+        0usize, 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1_024, 2_048, 4_096, 8_192, 16_384, 32_768,
+    ] {
+        group.bench_with_input(BenchmarkId::from_parameter(count), &count, |b, &count| {
+            let world = World::new();
+            let (ids, counter) = create_entities_with_mixed_components(&world, count);
+            let query = world
+                .query::<(&PositionComponent, &VelocityComponent)>()
+                .build();
+            for id in &ids {
+                let entity = world.entity_from_id(*id);
+                if entity.has::<PositionComponent>() && entity.has::<VelocityComponent>() {
+                    entity.observe::<EmptyEvent>(|source| {
+                        source.get::<PositionComponent>(|position| {
+                            source.get::<VelocityComponent>(|velocity| {
+                                black_box((position, velocity));
+                            });
+                        });
+                    });
+                }
+            }
+
+            b.iter(|| {
+                query.each_entity(|entity, _| {
+                    entity.emit::<EmptyEvent>();
+                });
+            });
+
+            black_box_counter(&counter);
+            drop(query);
+            black_box((&world, &ids));
+            black_box(counter);
+        });
+    }
+    group.finish();
+}
+
 fn criterion_benchmark(c: &mut Criterion) {
     bench_entity_suite(c);
     bench_update_suite(c);
     bench_extended_suite(c);
+    bench_event_suite(c);
 }
 
 criterion_group!(benches, criterion_benchmark);
